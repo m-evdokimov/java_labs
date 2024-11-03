@@ -1,5 +1,6 @@
 package ru.evdokimov.MySecondTestAppSpringBoot.controller;
 
+import java.text.ParseException;
 import java.util.Date;
 
 import org.springframework.beans.factory.annotation.Autowired;
@@ -20,7 +21,6 @@ import ru.evdokimov.MySecondTestAppSpringBoot.model.ErrorCodes;
 import ru.evdokimov.MySecondTestAppSpringBoot.model.ErrorMessages;
 import ru.evdokimov.MySecondTestAppSpringBoot.model.Request;
 import ru.evdokimov.MySecondTestAppSpringBoot.model.Response;
-import ru.evdokimov.MySecondTestAppSpringBoot.service.ModifyRequestService;
 import ru.evdokimov.MySecondTestAppSpringBoot.service.ModifyResponseService;
 import ru.evdokimov.MySecondTestAppSpringBoot.service.ValidationService;
 import ru.evdokimov.MySecondTestAppSpringBoot.util.DateTimeUtil;
@@ -30,25 +30,31 @@ import ru.evdokimov.MySecondTestAppSpringBoot.util.DateTimeUtil;
 public class MyController {
     private final ValidationService validationService;
     private final ModifyResponseService modifyResponseService;
-    private final ModifyRequestService modifyRequestService;
 
     @Autowired
     public MyController(ValidationService validationService,
-                        @Qualifier("ModifySystemTimeResponseService") ModifyResponseService modifyResponseService,
-                        @Qualifier("ModifyRequestDataService") ModifyRequestService modifyRequestService) {
+                        @Qualifier("ModifySystemTimeResponseService") ModifyResponseService modifyResponseService) {
         this.validationService = validationService;
         this.modifyResponseService = modifyResponseService;
-        this.modifyRequestService = modifyRequestService;
     }
 
     @PostMapping("/feedback")
     public ResponseEntity<Response> feedback(@Valid @RequestBody Request request, BindingResult bindingResult) {
         log.info("Request: {}", request);
 
+        var systemTime = DateTimeUtil.getCustomFormat().format(new Date());
+
+        try {
+            var systemTimeDiff = DateTimeUtil.getDateDifference(request.getSystemTime(), systemTime);
+            log.info("Time diff between requests: {}", systemTimeDiff);
+        } catch (ParseException e) {
+            log.error("systemTime parse exception \"{}\" occurred for request {}", e.getMessage(), request);
+        }
+
         var response = Response.builder()
                 .uid(request.getUid())
                 .operationUid(request.getOperationUid())
-                .systemTime(DateTimeUtil.getCustomFormat().format(new Date()))
+                .systemTime(systemTime)
                 .code(Codes.SUCCESS)
                 .errorCode(ErrorCodes.EMPTY)
                 .errorMessage(ErrorMessages.EMPTY)
@@ -77,7 +83,6 @@ public class MyController {
         }
 
         modifyResponseService.modify(response);
-        modifyRequestService.modify(request);
         log.info("Final response: {}", response);
 
         return new ResponseEntity<>(response, HttpStatus.OK);
